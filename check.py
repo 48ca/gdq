@@ -97,6 +97,6 @@ if __name__ == "__main__":
     while True:
         strnum = gdq.check_number()
         actual = int(strnum.split("/")[0].strip())
-        print("{}: {}{}". format(time.strftime("%Y-%m-%d %H:%M:%S"), strnum, '\a' if actual < GDQ_MEMBER_CAP or True else ''))
+        print("{}: {}{}". format(time.strftime("%Y-%m-%d %H:%M:%S"), strnum, '\a' if actual < GDQ_MEMBER_CAP else ''))
         time.sleep(5)
         gdq.refresh()
