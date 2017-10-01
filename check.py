@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 
 from notifications.twilio import TwilioNotifier
 from notifications.messenger import MessengerNotifier
 
 import getpass
 from os import environ, getenv
-from sys import stdout, exit
+from sys import exit, exc_info
 from os.path import join, dirname, exists
 from dotenv import load_dotenv
 
@@ -62,9 +59,6 @@ class GDQMemberChecker:
     def refresh(self):
         self.driver.refresh()
 
-gdq = None
-fbm = None
-
 def attempt_login(override=False):
     # Login helper function
     credentials_from_env = False
@@ -86,9 +80,14 @@ def attempt_login(override=False):
         else:
             attempt_login()
 
+notify_on_start = False
+
+gdq = None
+fbm = None
+twil = None
+
 def main():
-    global gdq
-    global fbm
+    global gdq, fbm, twil
 
     # Load environment
     dotenv_path = join(dirname(__file__), 'conf.env')
@@ -117,7 +116,6 @@ def main():
         twil = TwilioNotifier(**twil_settings)
         print("Started Twilio notifier")
     else:
-        twil = None
         print("Twilio notifier disabled")
 
     # Start messenger notifier
@@ -130,7 +128,6 @@ def main():
         fbm = MessengerNotifier(**fbm_settings)
         print("Started Messenger notifier")
     else:
-        fbm = None
         print("Messenger notifier disabled")
 
     # Start selenium
@@ -149,6 +146,11 @@ def main():
     gdq.navigate("profile")
 
     lastActual = None
+
+    if notify_on_start:
+        if twil: twil.notify("Successful restart")
+        if fbm:   fbm.notify("Successful restart")
+
     while True:
         strnum = gdq.check_number()
         actual = int(strnum.split("/")[0].strip())
@@ -162,9 +164,18 @@ def main():
         gdq.refresh()
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("Cleaning up...")
-        if gdq: gdq.destroy()
-        if fbm: fbm.logout()
+    while True:
+        try:
+            main()
+        except KeyboardInterrupt:
+            print("Cleaning up...")
+            if gdq: gdq.destroy()
+            if fbm: fbm.logout()
+            exit(0)
+        except:
+            print("Unexpected error: ", exc_info()[0])
+            print("Crashed... restarting")
+            notify_on_start = True
+            if gdq: gdq.destroy()
+            if fbm: fbm.notify("Checker crashed")
+            if twil: twil.notify("Checker crashed")
