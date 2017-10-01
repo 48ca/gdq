@@ -11,7 +11,7 @@ from notifications.messenger import MessengerNotifier
 import getpass
 from os import environ, getenv
 from sys import stdout, exit
-from os.path import join, dirname
+from os.path import join, dirname, exists
 from dotenv import load_dotenv
 
 import time
@@ -24,29 +24,25 @@ class GDQMemberChecker:
             self.driver = webdriver.PhantomJS()
         else:
             self.driver = webdriver.Chrome()
-        self.driver.get("https://gamesdonequick.com")
+        root_url = getenv("GDQ_URL")
+        self.login_url = root_url + getenv("GDQ_LOGIN_RELATIVE")
+        self.profile_url = root_url + getenv("GDQ_PROFILE_RELATIVE")
+        self.driver.get(root_url)
         assert "Games Done Quick" in self.driver.title
-        self.logged_in = len(self.driver.find_elements_by_link_text("Login")) == 0 # Normally is False
+        self.logged_in = False
 
     def destroy(self):
         self.driver.quit()
 
     def navigate(self, where):
         if where == 'login':
-            login_els = self.driver.find_elements_by_link_text("Login")
-            if len(login_els) > 0:
-                login_els[0].click()
+            self.driver.get(self.login_url)
         elif where == 'profile':
-            nav_els = self.driver.find_elements_by_css_selector("ul.nav.navbar-right")
-            if len(nav_els) > 0:
-                all_a = nav_els[0].find_elements(By.TAG_NAME, 'a')
-                a = list(filter(lambda x: "profile" in x.get_attribute("href"), all_a))
-                self.driver.get(a[0].get_attribute("href"))
-            else:
-                print("No nav elements; can't get profile link")
+            self.driver.get(self.profile_url)
         return False
 
     def login(self, email, password):
+        print("Logging in...")
         email_el = self.driver.find_element_by_id("email")
         password_el = self.driver.find_element_by_id("password")
 
@@ -96,6 +92,9 @@ def main():
 
     # Load environment
     dotenv_path = join(dirname(__file__), 'conf.env')
+    if not exists(dotenv_path):
+        print("No conf.env found... loading example")
+        dotenv_path = join(dirname(__file__), 'conf.env.example')
     load_dotenv(dotenv_path)
 
     # Read member cap
@@ -114,7 +113,7 @@ def main():
         'to': getenv("GDQ_TWILIO_PHONE_TO"),
         'fm': getenv("GDQ_TWILIO_PHONE_FROM")
     }
-    if all(value != '' for value in twil_settings.values()):
+    if all(bool(value) for value in twil_settings.values()):
         twil = TwilioNotifier(**twil_settings)
         print("Started Twilio notifier")
     else:
@@ -125,7 +124,7 @@ def main():
         'email': getenv("GDQ_MESSENGER_EMAIL"),
         'password': getenv("GDQ_MESSENGER_PASSWORD")
     }
-    if all(value != '' for value in fbm_settings.values()):
+    if all(bool(value) for value in fbm_settings.values()):
         print("Starting Messenger notifier")
         fbm = MessengerNotifier(**fbm_settings)
         print("Started Messenger notifier")
@@ -133,10 +132,14 @@ def main():
         print("Messenger notifier disabled")
 
     # Start selenium
-    gdq = GDQMemberChecker(GDQ_MEMBER_CAP, headless=False)
+    gdq = GDQMemberChecker(GDQ_MEMBER_CAP, headless=True)
+    print("Created browser")
     if not gdq.logged_in:
+        print("Attempting login")
         gdq.navigate("login")
         attempt_login()
+
+    print("Logged in")
 
     assert gdq.logged_in
 
@@ -160,5 +163,6 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
+        print("Cleaning up...")
         if gdq: gdq.destroy()
         if fbm: fbm.logout()
