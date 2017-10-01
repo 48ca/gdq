@@ -4,5 +4,20 @@ The script will ask you for your username and password, but you can also provide
 
 Every 5 seconds the script will check the number, and it will produce a system bell sound if the number it finds is less than the specified limit (default 1850).
 
+## Requirements
+Install the pip requirements from requirements.txt:
+```
+pip install -r requirements.txt
+```
+and install PhantomJS, the headless webkit browser.
+You may want to make accounts for Messenger or Twilio to get notified of any changes to the member count. Put these credentials in `conf.env`, or load them into the environment with the same variable names.
 ## Running
-Copy `conf.env.example` to `conf.env` and put the required variables in the file. They will be loaded upon execution of `check.py`. You need the GDQ default member cap specified, but nothing else is required. If not all values are specified for a certain notifier, the notifier will be automatically disabled.
+This script is set to run with no variables set (it will load the example environment), so you can just immediately run it upon installing all dependencies.
+```
+python3 check.py
+```
+You can set environment variables upon execution (if you aren't comfortable putting them in a file) by doing something similar to the following:
+```
+GDQ_EMAIL="test@example.com" GDQ_PASSWORD="hunter2" python3 check.py
+```
+If no password is specified in the environment (or if the environment credentials are incorrect), the script will prompt for a password.
