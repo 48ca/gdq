@@ -6,6 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 
 from notifications.twilio import TwilioNotifier
+from notifications.messenger import MessengerNotifier
 
 import getpass
 from os import environ, getenv
@@ -65,6 +66,9 @@ class GDQMemberChecker:
     def refresh(self):
         self.driver.refresh()
 
+gdq = None
+fbm = None
+
 def attempt_login(override=False):
     # Login helper function
     credentials_from_env = False
@@ -86,7 +90,9 @@ def attempt_login(override=False):
         else:
             attempt_login()
 
-if __name__ == "__main__":
+def main():
+    global gdq
+    global fbm
 
     # Load environment
     dotenv_path = join(dirname(__file__), 'conf.env')
@@ -111,6 +117,18 @@ if __name__ == "__main__":
     else:
         print("Twilio notifier disabled")
 
+    # Start messenger notifier
+    fbm_settings = {
+        'email': getenv("GDQ_MESSENGER_EMAIL"),
+        'password': getenv("GDQ_MESSENGER_PASSWORD")
+    }
+    if all(value != None for value in fbm_settings.values()):
+        print("Starting Messenger notifier")
+        fbm = MessengerNotifier(**fbm_settings)
+        print("Started Messenger notifier")
+    else:
+        print("Messenger notifier disabled")
+
     # Start selenium
     gdq = GDQMemberChecker(GDQ_MEMBER_CAP, headless=False)
     if not gdq.logged_in:
@@ -129,7 +147,15 @@ if __name__ == "__main__":
         print("{}: {}{}". format(time.strftime("%Y-%m-%d %H:%M:%S"), strnum, '\a: Registration open!' if actual < GDQ_MEMBER_CAP else ''))
         if lastActual != None and actual != lastActual:
             if twil: twil.notify("Spots changed to {} from {}".format(actual, lastActual))
+            if fbm:   fbm.notify("Spots changed to {} from {}".format(actual, lastActual))
         lastActual = actual
 
         time.sleep(5)
         gdq.refresh()
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        if gdq: gdq.destroy()
+        if fbm: fbm.logout()
