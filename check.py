@@ -117,6 +117,7 @@ def main():
         twil = TwilioNotifier(**twil_settings)
         print("Started Twilio notifier")
     else:
+        twil = None
         print("Twilio notifier disabled")
 
     # Start messenger notifier
@@ -129,6 +130,7 @@ def main():
         fbm = MessengerNotifier(**fbm_settings)
         print("Started Messenger notifier")
     else:
+        fbm = None
         print("Messenger notifier disabled")
 
     # Start selenium
