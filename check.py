@@ -5,18 +5,20 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 
+from notifications.twilio import TwilioNotifier
+
 import getpass
 from os import environ, getenv
 from sys import stdout
+from os.path import join, dirname
+from dotenv import load_dotenv
 
 import time
-
-GDQ_DEFAULT_CAP = 1850
 
 class GDQMemberChecker:
 
     def __init__(self, cap, *args, **kwargs):
-        self.member_cap = cap or GDQ_DEFAULT_CAP
+        self.member_cap = cap
         if kwargs['headless']:
             self.driver = webdriver.PhantomJS()
         else:
@@ -32,7 +34,6 @@ class GDQMemberChecker:
         if where == 'login':
             login_els = self.driver.find_elements_by_link_text("Login")
             if len(login_els) > 0:
-                print("Logging in...")
                 login_els[0].click()
         elif where == 'profile':
             nav_els = self.driver.find_elements_by_css_selector("ul.nav.navbar-right")
@@ -58,45 +59,77 @@ class GDQMemberChecker:
 
     def check_number(self):
         # There is no real way to find the limit in GDQ's markup, so I'll just search for the limit
-        num_el = self.driver.find_element_by_xpath("//*[contains(text(), '{}')]".format(GDQ_MEMBER_CAP))
+        num_el = self.driver.find_element_by_xpath("//*[contains(text(), '{}')]".format(self.member_cap))
         return num_el.get_attribute("textContent")
 
     def refresh(self):
         self.driver.refresh()
 
+def attempt_login(override=False):
+    # Login helper function
+    credentials_from_env = False
+    email = environ.get("GDQ_EMAIL")
+    if not email or override:
+        email = input("Email: ").strip()
+    else:
+        credentials_from_env = True
+    password = environ.get("GDQ_PASSWORD")
+    if not password or override:
+        password = getpass.getpass("Password: ").strip()
+    else:
+        credentials_from_env = True
+    if not gdq.login(email, password):
+        if credentials_from_env:
+            print("WARN: Environment credentials are incorrect")
+            print("Prompting for user input")
+            attempt_login(True)
+        else:
+            attempt_login()
+
 if __name__ == "__main__":
-    GDQ_MEMBER_CAP = getenv("GDQ_MEMBER_CAP", 1850)
 
+    # Load environment
+    dotenv_path = join(dirname(__file__), 'conf.env')
+    load_dotenv(dotenv_path)
+
+    # Read member cap
+    GDQ_MEMBER_CAP = int(getenv("GDQ_MEMBER_CAP"))
+    if not GDQ_MEMBER_CAP:
+        print("No member cap specified. Exiting...")
+        sys.exit(1)
+
+    # Start twilio notifier
+    twil_settings = {
+        'sid': getenv("GDQ_TWILIO_SID"),
+        'token': getenv("GDQ_TWILIO_TOKEN"),
+        'to': getenv("GDQ_TWILIO_PHONE_TO"),
+        'fm': getenv("GDQ_TWILIO_PHONE_FROM")
+    }
+    if all(value != None for value in twil_settings.values()):
+        twil = TwilioNotifier(**twil_settings)
+        print("Started Twilio notifier")
+    else:
+        print("Twilio notifier disabled")
+
+    # Start selenium
     gdq = GDQMemberChecker(GDQ_MEMBER_CAP, headless=False)
-    gdq.navigate("login")
+    if not gdq.logged_in:
+        gdq.navigate("login")
+        attempt_login()
 
-    def login(override=False):
-        credentials_from_env = False
-        email = environ.get("GDQ_EMAIL")
-        if not email or override:
-            email = input("Email: ").strip()
-        else:
-            credentials_from_env = True
-        password = environ.get("GDQ_PASSWORD")
-        if not password or override:
-            password = getpass.getpass("Password: ").strip()
-        else:
-            credentials_from_env = True
-        if not gdq.login(email, password):
-            if credentials_from_env:
-                print("WARN: Environment credentials are incorrect")
-                print("Prompting for user input")
-                login(True)
-            else:
-                login()
-    login()
+    assert gdq.logged_in
 
-    assert len(gdq.driver.find_elements_by_link_text("Login")) == 0
-
+    # Load profile page -- contains member count
     gdq.navigate("profile")
+
+    lastActual = None
     while True:
         strnum = gdq.check_number()
         actual = int(strnum.split("/")[0].strip())
-        print("{}: {}{}". format(time.strftime("%Y-%m-%d %H:%M:%S"), strnum, '\a' if actual < GDQ_MEMBER_CAP else ''))
+        print("{}: {}{}". format(time.strftime("%Y-%m-%d %H:%M:%S"), strnum, '\a: Registration open!' if actual < GDQ_MEMBER_CAP else ''))
+        if lastActual != None and actual != lastActual:
+            if twil: twil.notify("Spots changed to {} from {}".format(actual, lastActual))
+        lastActual = actual
+
         time.sleep(5)
         gdq.refresh()
