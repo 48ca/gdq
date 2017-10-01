@@ -10,7 +10,7 @@ from notifications.messenger import MessengerNotifier
 
 import getpass
 from os import environ, getenv
-from sys import stdout
+from sys import stdout, exit
 from os.path import join, dirname
 from dotenv import load_dotenv
 
@@ -99,10 +99,13 @@ def main():
     load_dotenv(dotenv_path)
 
     # Read member cap
-    GDQ_MEMBER_CAP = int(getenv("GDQ_MEMBER_CAP"))
-    if not GDQ_MEMBER_CAP:
+    GDQ_MEMBER_CAP_STR = getenv("GDQ_MEMBER_CAP")
+    if not GDQ_MEMBER_CAP_STR:
         print("No member cap specified. Exiting...")
-        sys.exit(1)
+        print("Did you prepare conf.env?")
+        exit(1)
+
+    GDQ_MEMBER_CAP = int(GDQ_MEMBER_CAP_STR)
 
     # Start twilio notifier
     twil_settings = {
@@ -111,7 +114,7 @@ def main():
         'to': getenv("GDQ_TWILIO_PHONE_TO"),
         'fm': getenv("GDQ_TWILIO_PHONE_FROM")
     }
-    if all(value != None for value in twil_settings.values()):
+    if all(value != '' for value in twil_settings.values()):
         twil = TwilioNotifier(**twil_settings)
         print("Started Twilio notifier")
     else:
@@ -122,7 +125,7 @@ def main():
         'email': getenv("GDQ_MESSENGER_EMAIL"),
         'password': getenv("GDQ_MESSENGER_PASSWORD")
     }
-    if all(value != None for value in fbm_settings.values()):
+    if all(value != '' for value in fbm_settings.values()):
         print("Starting Messenger notifier")
         fbm = MessengerNotifier(**fbm_settings)
         print("Started Messenger notifier")
