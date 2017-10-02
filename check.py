@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 
 from notifications.twilio import TwilioNotifier
 from notifications.messenger import MessengerNotifier
@@ -152,7 +153,11 @@ def main():
         if fbm:   fbm.notify("Successful restart")
 
     while True:
-        strnum = gdq.check_number()
+        try:
+            strnum = gdq.check_number()
+        except NoSuchElementException:
+            gdq.refresh()
+            continue
         actual = int(strnum.split("/")[0].strip())
         print("{}: {}{}". format(time.strftime("%Y-%m-%d %H:%M:%S"), strnum, '\a: Registration open!' if actual < GDQ_MEMBER_CAP else ''))
         if lastActual != None and actual != lastActual:
