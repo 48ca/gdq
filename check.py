@@ -113,7 +113,7 @@ def main():
         'to': getenv("GDQ_TWILIO_PHONE_TO"),
         'fm': getenv("GDQ_TWILIO_PHONE_FROM")
     }
-    if all(bool(value) for value in twil_settings.values()):
+    if not twil and all(bool(value) for value in twil_settings.values()):
         twil = TwilioNotifier(**twil_settings)
         print("Started Twilio notifier")
     else:
@@ -124,7 +124,7 @@ def main():
         'email': getenv("GDQ_MESSENGER_EMAIL"),
         'password': getenv("GDQ_MESSENGER_PASSWORD")
     }
-    if all(bool(value) for value in fbm_settings.values()):
+    if not fbm and all(bool(value) for value in fbm_settings.values()):
         print("Starting Messenger notifier")
         fbm = MessengerNotifier(**fbm_settings)
         print("Started Messenger notifier")
