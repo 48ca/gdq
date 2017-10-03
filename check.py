@@ -8,7 +8,7 @@ from notifications.messenger import MessengerNotifier
 
 import getpass
 from os import environ, getenv
-from sys import exit, exc_info
+from sys import exit, exc_info, stdout
 from os.path import join, dirname, exists
 from dotenv import load_dotenv
 
@@ -113,7 +113,9 @@ def main():
         'to': getenv("GDQ_TWILIO_PHONE_TO"),
         'fm': getenv("GDQ_TWILIO_PHONE_FROM")
     }
-    if not twil and all(bool(value) for value in twil_settings.values()):
+    if twil:
+        pass
+    elif all(bool(value) for value in twil_settings.values()):
         twil = TwilioNotifier(**twil_settings)
         print("Started Twilio notifier")
     else:
@@ -124,7 +126,9 @@ def main():
         'email': getenv("GDQ_MESSENGER_EMAIL"),
         'password': getenv("GDQ_MESSENGER_PASSWORD")
     }
-    if not fbm and all(bool(value) for value in fbm_settings.values()):
+    if fbm:
+        pass
+    elif all(bool(value) for value in fbm_settings.values()):
         print("Starting Messenger notifier")
         fbm = MessengerNotifier(**fbm_settings)
         print("Started Messenger notifier")
@@ -152,17 +156,22 @@ def main():
         if twil: twil.notify("Successful restart")
         if fbm:   fbm.notify("Successful restart")
 
+    print("Started polling at {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
+    stdout.write("Last result: Reading...")
     while True:
         try:
             strnum = gdq.check_number()
         except NoSuchElementException:
+            print("Caught NoSuchElementException")
             gdq.refresh()
             continue
         actual = int(strnum.split("/")[0].strip())
-        print("{}: {}{}". format(time.strftime("%Y-%m-%d %H:%M:%S"), strnum, '\a: Registration open!' if actual < GDQ_MEMBER_CAP else ''))
+        stdout.write("\rLast result: {}: {}{}". format(time.strftime("%Y-%m-%d %H:%M:%S"), strnum, '\a' if actual < GDQ_MEMBER_CAP else ''))
         if lastActual != None and actual != lastActual:
-            if twil: twil.notify("Spots changed to {} from {}".format(actual, lastActual))
-            if fbm:   fbm.notify("Spots changed to {} from {}".format(actual, lastActual))
+            msg = "Spots changed to {} from {}".format(actual, lastActual)
+            if twil: twil.notify(msg)
+            if fbm:   fbm.notify(msg)
+            print("{}: {}".format(time.strftime("%Y-%m-%d %H:%M:%S"), msg))
         lastActual = actual
 
         time.sleep(5)
