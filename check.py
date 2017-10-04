@@ -158,20 +158,27 @@ def main():
 
     print("Started polling at {}".format(time.strftime("%Y-%m-%d %H:%M:%S")))
     stdout.write("Last result: Reading...")
+    err_count = 0
     while True:
         try:
             strnum = gdq.check_number()
         except NoSuchElementException:
+            err_count += 1
             print("Caught NoSuchElementException")
+            if err_count > 5:
+                print("Restarting for receiving too many NoSuchElementExceptions")
+                raise RuntimeError("Too many NoSuchElementExceptions")
+            time.sleep(1)
             gdq.refresh()
             continue
+        err_count = 0
         actual = int(strnum.split("/")[0].strip())
         stdout.write("\rLast result: {}: {}{}". format(time.strftime("%Y-%m-%d %H:%M:%S"), strnum, '\a' if actual < GDQ_MEMBER_CAP else ''))
         if lastActual != None and actual != lastActual:
             msg = "Spots changed to {} from {}".format(actual, lastActual)
             if twil: twil.notify(msg)
             if fbm:   fbm.notify(msg)
-            print("{}: {}".format(time.strftime("%Y-%m-%d %H:%M:%S"), msg))
+            print("\r{}: {}".format(time.strftime("%Y-%m-%d %H:%M:%S"), msg))
         lastActual = actual
 
         time.sleep(5)
