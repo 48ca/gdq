@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 
 import time
 
+HEADLESS=True
+
 class GDQMemberChecker:
 
     def __init__(self, cap, *args, **kwargs):
@@ -136,7 +138,7 @@ def main():
         print("Messenger notifier disabled")
 
     # Start selenium
-    gdq = GDQMemberChecker(GDQ_MEMBER_CAP, headless=True)
+    gdq = GDQMemberChecker(GDQ_MEMBER_CAP, headless=HEADLESS)
     print("Created browser")
     if not gdq.logged_in:
         print("Attempting login")
@@ -163,6 +165,7 @@ def main():
         try:
             strnum = gdq.check_number()
         except NoSuchElementException:
+            gdq.save_screenshot("no_such_element.png")
             err_count += 1
             print("Caught NoSuchElementException")
             if err_count > 5:
